@@ -33,11 +33,24 @@ func (p *LayoutProject) ValidateRules() []ValidationIssue {
 	for k := range adj {
 		sort.Strings(adj[k])
 	}
-	for _, from := range g.EntranceIDs {
-		for _, to := range adj[from] {
-			if !hasSignAt(p.Signs, to) {
-				add(RuleContinuity, to, "error")
-			}
+	entranceSet := map[string]bool{}
+	for _, id := range g.EntranceIDs {
+		entranceSet[id] = true
+	}
+	destinationSet := map[string]bool{}
+	for _, id := range g.DestinationIDs {
+		destinationSet[id] = true
+	}
+	reachable := Reachable(g)
+	for _, n := range g.Nodes {
+		if entranceSet[n.ID] || destinationSet[n.ID] {
+			continue
+		}
+		if !reachable[n.ID] {
+			continue
+		}
+		if !hasSignAt(p.Signs, n.ID) {
+			add(RuleContinuity, n.ID, "error")
 		}
 	}
 	for _, n := range g.Nodes {
@@ -62,7 +75,6 @@ func (p *LayoutProject) ValidateRules() []ValidationIssue {
 			}
 		}
 	}
-	reachable := Reachable(g)
 	for _, id := range g.DestinationIDs {
 		if !reachable[id] {
 			add(RuleDestinationReachability, id, "error")
