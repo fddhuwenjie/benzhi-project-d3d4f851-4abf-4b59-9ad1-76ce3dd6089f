@@ -64,7 +64,7 @@ func (s *Service) rememberReplay(meta CommandMeta, command any, result *Mutation
 		}
 		s.replayIDs = append(s.replayIDs, key)
 	}
-	s.replayMap[key] = replayCacheEntry{fingerprint: fingerprint(command), result: result}
+	s.replayMap[key] = replayCacheEntry{fingerprint: fingerprint(command), result: cloneMutationResult(result)}
 	s.replayMu.Unlock()
 }
 
@@ -79,13 +79,22 @@ func cloneProject(p *domain.LayoutProject) *domain.LayoutProject {
 	_ = json.Unmarshal(b, &cp)
 	return &cp
 }
+func cloneMutationResult(r *MutationResult) *MutationResult {
+	if r == nil {
+		return nil
+	}
+	b, _ := json.Marshal(r)
+	var cp MutationResult
+	_ = json.Unmarshal(b, &cp)
+	return &cp
+}
 
 func (s *Service) replay(ctx context.Context, meta CommandMeta, command any) (*MutationResult, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, false, err
 	}
 	if result, ok, err := s.cachedReplay(meta, command); ok {
-		return result, true, err
+		return cloneMutationResult(result), true, err
 	}
 	rec, err := s.repo.FindRequest(ctx, meta.ProjectID, meta.RequestID)
 	if err != nil && !errors.Is(err, ErrNotFound) {
@@ -105,7 +114,7 @@ func (s *Service) replay(ctx context.Context, meta CommandMeta, command any) (*M
 		return nil, true, err
 	}
 	s.rememberReplay(meta, command, &result)
-	return &result, true, nil
+	return cloneMutationResult(&result), true, nil
 }
 
 func (s *Service) execute(ctx context.Context, meta CommandMeta, command any, eventType string, mutate func(*domain.LayoutProject) (MutationResult, error)) (MutationResult, error) {
