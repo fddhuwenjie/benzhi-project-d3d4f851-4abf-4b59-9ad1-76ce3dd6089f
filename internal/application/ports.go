@@ -12,6 +12,7 @@ var (
 	ErrNotFound            = errors.New("项目不存在")
 	ErrRevisionConflict    = errors.New("expected_revision 与当前修订不一致")
 	ErrIdempotencyConflict = errors.New("request_id 已用于不同请求")
+	ErrPersistenceFailed   = errors.New("失败请求记录持久化失败")
 )
 
 type RequestRecord struct {

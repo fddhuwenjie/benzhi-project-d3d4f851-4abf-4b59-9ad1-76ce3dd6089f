@@ -70,27 +70,22 @@ func (s *Service) execute(ctx context.Context, meta CommandMeta, command any, ev
 		return MutationResult{}, err
 	}
 	if p.Revision != meta.ExpectedRevision {
-		_ = s.persistFailure(ctx, meta, command, ErrRevisionConflict)
-		return MutationResult{}, ErrRevisionConflict
+		return MutationResult{}, s.persistFailure(ctx, meta, command, ErrRevisionConflict)
 	}
 	if err := p.EnsureEditable(); err != nil {
-		_ = s.persistFailure(ctx, meta, command, err)
-		return MutationResult{}, err
+		return MutationResult{}, s.persistFailure(ctx, meta, command, err)
 	}
 	cp := cloneProject(p)
 	result, mutErr := mutate(cp)
-	rec := RequestRecord{ProjectID: meta.ProjectID, RequestID: meta.RequestID, Fingerprint: fingerprint(command), CreatedAt: s.now()}
 	if mutErr != nil {
-		rec.Error = mutErr.Error()
-		_ = s.repo.SaveRequest(ctx, meta.ProjectID, rec)
-		return MutationResult{}, mutErr
+		return MutationResult{}, s.persistFailure(ctx, meta, command, mutErr)
 	}
 	cp.Revision++
 	result.ProjectID = cp.ProjectID
 	result.Revision = cp.Revision
 	result.Status = cp.Status
 	payload, _ := json.Marshal(result)
-	rec.Response = payload
+	rec := RequestRecord{ProjectID: meta.ProjectID, RequestID: meta.RequestID, Fingerprint: fingerprint(command), Response: payload, CreatedAt: s.now()}
 	details := map[string]string{"message": result.Message}
 	if result.Package != nil {
 		details["package_id"] = result.Package.PackageID
@@ -113,7 +108,10 @@ func recordedError(message string) error {
 }
 func (s *Service) persistFailure(ctx context.Context, meta CommandMeta, command any, failure error) error {
 	rec := RequestRecord{ProjectID: meta.ProjectID, RequestID: meta.RequestID, Fingerprint: fingerprint(command), Error: failure.Error(), CreatedAt: s.now()}
-	return s.repo.SaveRequest(ctx, meta.ProjectID, rec)
+	if err := s.repo.SaveRequest(ctx, meta.ProjectID, rec); err != nil {
+		return errors.Join(failure, ErrPersistenceFailed, err)
+	}
+	return failure
 }
 func deref(r *MutationResult) MutationResult {
 	if r == nil {
