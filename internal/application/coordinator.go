@@ -32,6 +32,12 @@ func (c *Coordinator) LockContext(ctx context.Context, id string) (func(), error
 	c.mu.Unlock()
 	select {
 	case <-ctx.Done():
+		c.mu.Lock()
+		e.refs--
+		if e.refs == 0 {
+			delete(c.locks, id)
+		}
+		c.mu.Unlock()
 		return nil, ctx.Err()
 	case <-e.token:
 	}
