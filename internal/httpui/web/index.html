@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>导向放样审批台</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <style>
+    select{width:100%;border:1px solid #c9d1cb;border-radius:4px;background:#fff;padding:10px;color:#1d2921}
+    .result-strip{margin:12px 0;padding:12px;border:1px solid var(--line);border-radius:4px;background:#fff;font-size:13px;line-height:1.65;word-break:break-word}
+    .result-strip.bad{border-color:#d9aaa6;background:#fff8f7}.filters{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr)) auto;gap:8px;margin:12px 0}
+    .checkpoint{align-items:start}.checkpoint-main{display:grid;gap:8px;flex:1}.checkpoint input[type=checkbox]{width:auto}.impact,.history{margin-top:10px;color:#425148;font-size:13px}
+    .history{padding-left:16px}.walk-round{border-top:1px solid var(--line);padding:12px 2px}.walk-round small{color:var(--muted)}
+    @media(max-width:760px){.filters{grid-template-columns:1fr}.approval{align-items:stretch;flex-direction:column}.checkpoint{display:grid}}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div><span class="brand-mark">W</span><strong>导向放样审批台</strong></div>
+    <div id="connection" class="connection">本地数据</div>
+  </header>
+  <main>
+    <aside class="sidebar">
+      <div class="side-title"><span>放样项目</span><button id="newProject" class="icon" title="新建项目">＋</button></div>
+      <div id="projectList" class="project-list"></div>
+    </aside>
+    <section class="workspace">
+      <div id="emptyState" class="empty"><h1>选择或创建放样项目</h1><p>审批资料仅保存在当前服务的数据目录。</p></div>
+      <div id="projectView" hidden>
+        <div class="project-header">
+          <div><p class="eyebrow">当前项目</p><h1 id="buildingName"></h1><p id="projectMeta"></p></div>
+          <div class="status-stack"><span id="statusBadge" class="status"></span><span id="revision"></span></div>
+        </div>
+        <nav class="tabs" aria-label="项目视图">
+          <button data-tab="design" class="active">路径与标识</button><button data-tab="issues">规则问题</button><button data-tab="review">走查复核</button><button data-tab="package">冻结包</button><button data-tab="timeline">时间线</button>
+        </nav>
+        <section id="design" class="tab active">
+          <div class="section-head"><div><h2>勘测基线</h2><p>冻结后入口、目的地和通行约束不可变。</p></div><button id="freezeBaseline">预检基线</button></div>
+          <div class="grid two"><label>节点 JSON<textarea id="nodesInput" rows="8"></textarea></label><label>连接 JSON<textarea id="edgesInput" rows="8"></textarea></label></div>
+          <div id="baselinePreflight" class="result-strip" hidden></div>
+          <div class="section-head"><div><h2>候选标识</h2><p>在每个关键决策点保持指引连续。</p></div><div><button id="saveSigns" class="secondary">保存方案</button><button id="validateRules">执行校验</button></div></div>
+          <label>标识 JSON<textarea id="signsInput" rows="11"></textarea></label>
+          <div id="signPreflight" class="result-strip" hidden></div>
+        </section>
+        <section id="issues" class="tab"><div class="section-head"><div><h2>规则问题</h2><p>录入整改结论与证据摘要后复验。</p></div><button id="reverify">重新校验</button></div><div class="filters"><select id="severityFilter"><option value="">全部级别</option><option value="error">错误</option><option value="warning">警告</option></select><select id="ruleFilter"><option value="">全部规则</option><option>CONTINUITY</option><option>DECISION_COVERAGE</option><option>ACCESSIBLE_CONSISTENCY</option><option>DUPLICATE_CONTENT</option><option>DESTINATION_REACHABILITY</option></select><input id="nodeFilter" placeholder="节点 ID"><select id="statusFilter"><option value="">全部状态</option><option value="open">未解决</option><option value="resolved">已关闭</option></select><button id="clearFilters" class="secondary">清除</button></div><div id="issueSummary" class="result-strip"></div><div id="issueList"></div></section>
+        <section id="review" class="tab"><div class="section-head"><div><h2>确定性走查路线</h2><p>指定复核员逐站确认可见性和方向。</p></div><button id="submitWalkthrough">提交走查</button></div><div id="routeList"></div><div id="walkthroughHistory"></div><div class="approval"><label>复核员 ID<input id="reviewerInput"></label><button id="approvalPreflight" class="secondary">批准预检</button><button id="freezePackage">签署并冻结</button></div><div id="approvalResult" class="result-strip" hidden></div></section>
+        <section id="package" class="tab"><div class="section-head"><div><h2>安装放样包</h2><p>冻结内容不可修改，可随时执行深度核验。</p></div><div><button id="verifyPackage" class="secondary">深度核验</button><button id="downloadPackage">下载</button></div></div><pre id="packageInfo">尚未冻结</pre><div id="verificationResult" class="result-strip" hidden></div></section>
+        <section id="timeline" class="tab"><h2>状态时间线</h2><div id="timelineList"></div></section>
+      </div>
+    </section>
+  </main>
+  <dialog id="createDialog"><form method="dialog"><div class="dialog-head"><h2>新建放样项目</h2><button value="cancel" class="icon" title="关闭">×</button></div><label>项目 ID<input id="newID" required></label><label>建筑名称<input id="newBuilding" required></label><div class="grid two"><label>设计员 ID<input id="newDesigner" required></label><label>复核员 ID<input id="newReviewer" required></label></div><label>建筑区域（逗号分隔）<input id="newZones"></label><div class="dialog-actions"><button value="cancel" class="secondary">取消</button><button id="createSubmit" value="default">创建</button></div></form></dialog>
+  <div id="toast" role="status"></div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
